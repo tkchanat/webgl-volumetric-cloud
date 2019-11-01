@@ -1,0 +1,24 @@
+{
+  "name": "volumetriccloud",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "browserify": "^16.5.0",
+    "requirejs": "^2.3.6",
+    "simple-hot-reload-server": "^1.2.0",
+    "three": "^0.110.0",
+    "tooloud": "^2.0.4",
+    "watchify": "^3.11.1"
+  },
+  "devDependencies": {
+    "babel-core": "^6.26.3",
+    "babel-preset-es2015": "^6.24.1",
+    "babelify": "^10.0.0"
+  }
+}
