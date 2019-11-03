@@ -5,14 +5,20 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "serve": "browser-sync start -s -f . --no-notify --host $LOCAL_IP --port 5411"
+    "serve": "webpack-dev-server --entry ./src/index.js --output-filename ./dist/main.js",
+    "generate": "node generate.js"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "livereload": "^0.8.2",
+    "dat.gui": "^0.7.6",
     "stats.js": "^0.17.0",
     "three": "^0.110.0",
     "tooloud": "^2.0.4"
+  },
+  "devDependencies": {
+    "webpack": "^4.41.2",
+    "webpack-cli": "^3.3.10",
+    "webpack-dev-server": "^3.9.0"
   }
 }
