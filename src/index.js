@@ -96,7 +96,7 @@ function fragmentShader() {
                 float DA = DensityAlter(v, map);
                 
                 // detail_map
-                vec4 sn = texture(detail_map, 7.0 * vec3(u, v, w));
+                vec4 sn = texture(detail_map, 1.5 * vec3(p.x, p.y, p.z));
                 float SN = R(sn.r, (sn.g * 0.625 + sn.b * 0.25 + sn.a * 0.125) - 1.0, 1.0, 0.0, 1.0);
                 alpha += SAT(R(SN * SA, 1.0 - global_coverage * WM, 1.0, 0.0, 1.0)) * DA;
                 if(alpha >= 1.0) {
@@ -153,16 +153,17 @@ var scene = new THREE.Scene();
 var resolution = new THREE.Vector2(canvas.width, canvas.height);
 var camera = new THREE.PerspectiveCamera(75, resolution.x / resolution.y, 0.1, 1000);
 camera.position.z = 2;
-scene.background = new THREE.CubeTextureLoader()
-    .setPath('res/textures/')
-    .load([
-        'px.png',
-        'nx.png',
-        'py.png',
-        'ny.png',
-        'pz.png',
-        'nz.png'
-    ]);
+scene.background = new THREE.Color(0x000000);
+// scene.background = new THREE.CubeTextureLoader()
+//     .setPath('res/textures/')
+//     .load([
+//         'px.png',
+//         'nx.png',
+//         'py.png',
+//         'ny.png',
+//         'pz.png',
+//         'nz.png'
+//     ]);
 
 
 /**
