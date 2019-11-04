@@ -8,7 +8,6 @@ precision highp sampler2D;
 precision highp sampler3D;
 precision highp float;
 
-
 in vec2 frag_uv;
 out vec4 out_color;
 
@@ -23,6 +22,11 @@ uniform vec3 sun_color;
 uniform float global_coverage;
 uniform float global_density;
 uniform float global_lightAbsorption;
+uniform float cloud_in_scatter;
+uniform float cloud_out_scatter;
+uniform float cloud_scatter_ratio;
+uniform float cloud_silver_intensity;
+uniform float cloud_silver_exponent;
 
 float R(float v, float lo, float ho, float ln, float hn) {
     return ln + (v - lo) * (hn - ln) / (ho - lo);
@@ -87,6 +91,19 @@ float SampleDensity(vec3 p) {
     return density;
 }
 
+float HG(float cosTheta, float g) {
+    float g2 = g * g;
+    return ((1.0 - g2) / pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5)) / 4.0 * PI;
+}
+
+float InOutScatter(float cosTheta) {
+    float hg1 = HG(cosTheta, cloud_in_scatter);
+    float hg2 = cloud_silver_intensity * pow(SAT(cosTheta), cloud_silver_exponent);
+    float in_scatter_hg = max(hg1, hg2);
+    float out_scatter_hg = HG(cosTheta, -cloud_out_scatter);
+    return LERP(in_scatter_hg, out_scatter_hg, cloud_scatter_ratio);
+}
+
 float LightMarch(vec3 p) {
     vec3 direction = normalize(sunPosition);
     float stepSize = 0.5 * (skyMax.y - skyMin.y) / float(SUN_STEPS);
@@ -115,9 +132,9 @@ void main() {
     for(int i = 0; i < MAX_ITERATION; ++i) {
         vec3 rayPosition = rayOrigin + rayDirection * distanceTravelled;
         float density = SampleDensity(rayPosition);
+        totalDensity += density;
         if(density > 0.0) {
             float transmittance = LightMarch(rayPosition);
-            totalDensity += density;
             attenuation *= transmittance;
             distanceTravelled += stepSize / 10.0;
             continue;
@@ -126,6 +143,8 @@ void main() {
     }
 
     // calculate final color
-    vec3 color = sun_color * attenuation;
+    float cosTheta = dot(normalize(sunPosition), rayDirection);
+    float highlight = InOutScatter(cosTheta);
+    vec3 color = sun_color * attenuation * highlight;
     out_color = vec4(color, totalDensity);
 }

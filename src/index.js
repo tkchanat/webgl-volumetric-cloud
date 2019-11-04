@@ -17,7 +17,12 @@ var configLayout = function () {
     this.global_coverage = 0.27;
     this.global_density = 0.16;
     this.global_lightAbsorption = 1.0;
-    this.sun_color = 0xe8f5ff;
+    this.sun_color = 0xffffff; //0xfdf5e4; //0xe8f5ff;
+    this.cloud_in_scatter = 0.43;
+    this.cloud_out_scatter = 0.47;
+    this.cloud_scatter_ratio = 0.76;
+    this.cloud_silver_intensity = 4.3;
+    this.cloud_silver_exponent = 2.3;
 };
 var config = new configLayout();
 var gui = new dat.GUI();
@@ -25,6 +30,11 @@ gui.add(config, "global_coverage", 0.0, 1.0).step(0.001);
 gui.add(config, "global_density", 0.01, 0.5).step(0.001);
 gui.add(config, "global_lightAbsorption", 0.0, 3.0).step(0.001);
 gui.addColor(config, 'sun_color');
+gui.add(config, "cloud_in_scatter", 0.0, 1.0).step(0.001);
+gui.add(config, "cloud_out_scatter", 0.0, 1.0).step(0.001);
+gui.add(config, "cloud_scatter_ratio", 0.0, 1.0).step(0.001);
+gui.add(config, "cloud_silver_intensity", 0.0, 10.0).step(0.001);
+gui.add(config, "cloud_silver_exponent", 0.0, 10.0).step(0.001);
 
 // resources declaration
 var resourceStatus = {
@@ -101,7 +111,7 @@ function WaitAllResources() {
     if (allTrue) {
         setTimeout(()=> {
             Run();
-            overlay.clearRect(0, 0, canvas.width, canvas.height);
+            document.body.removeChild(document.getElementById("overlay"));
         }, 10);
     }
     else setTimeout(WaitAllResources, 10);
@@ -133,6 +143,11 @@ function Run() {
         global_coverage: new THREE.Uniform(config.global_coverage),
         global_density: new THREE.Uniform(config.global_density),
         global_lightAbsorption: new THREE.Uniform(config.global_lightAbsorption),
+        cloud_in_scatter: new THREE.Uniform(config.cloud_in_scatter),
+        cloud_out_scatter: new THREE.Uniform(config.cloud_out_scatter),
+        cloud_scatter_ratio: new THREE.Uniform(config.cloud_scatter_ratio),
+        cloud_silver_intensity: new THREE.Uniform(config.cloud_silver_intensity),
+        cloud_silver_exponent: new THREE.Uniform(config.cloud_silver_exponent),
     }
     var planeMaterial = new THREE.RawShaderMaterial({
         uniforms: uniforms,
@@ -159,12 +174,17 @@ function Run() {
         planeMaterial.uniforms.global_coverage.value = config.global_coverage;
         planeMaterial.uniforms.global_density.value = config.global_density;
         planeMaterial.uniforms.global_lightAbsorption.value = config.global_lightAbsorption;
+        planeMaterial.uniforms.cloud_in_scatter.value = config.cloud_in_scatter;
+        planeMaterial.uniforms.cloud_out_scatter.value = config.cloud_out_scatter;
+        planeMaterial.uniforms.cloud_scatter_ratio.value = config.cloud_scatter_ratio;
+        planeMaterial.uniforms.cloud_silver_intensity.value = config.cloud_silver_intensity;
+        planeMaterial.uniforms.cloud_silver_exponent.value = config.cloud_silver_exponent;
         renderer.clear();
         renderer.render(scene, camera);
         setTimeout(function () {
             requestAnimationFrame(animate);
             stats.end();
-        }, 1000 / 30);
+        }, 1000 / 20);
     };
     animate();
 }
