@@ -5,10 +5,10 @@ import dat from 'dat.gui';
 function vertexShader() {
     return `#version 300 es
     in vec2 uv;
-    out vec2 frag_uv; 
+    // out vec2 frag_uv; 
   
     void main() {
-        frag_uv = uv; 
+        // frag_uv = uv; 
         gl_Position = vec4(2.0 * uv - 1.0, 0.0, 1.0); 
     }
 `
@@ -78,8 +78,8 @@ function fragmentShader() {
         return ret_val;
     }
 
-    const float interval = 0.005;
     float ray_march(vec3 ro, vec3 rd) {
+        float interval = 0.1 * (1.0 - max(dot(rd, vec3(0, 1, 0)), 0.0));
         float d = 0.0;
         float alpha = 0.0;
         for(int i = 0; i < MAX_ITERATION; ++i) {
@@ -91,18 +91,18 @@ function fragmentShader() {
 
                 // weather_map
                 vec4 map = texture(weather_map, vec2(u, w));
-                float WM = max(map.r, SAT(global_coverage - 0.5) * map.g * 2.0);
+                float WM = max(map.r, SAT(global_coverage - 0.1) * map.g * 2.0);
                 float SA = HeightAlter(v, map);
                 float DA = DensityAlter(v, map);
-                
+
                 // detail_map
-                vec4 sn = texture(detail_map, 1.5 * vec3(p.x, p.y, p.z));
+                vec4 sn = texture(detail_map, .5 + .5 * vec3(p.x, p.y, p.z));
                 float SN = R(sn.r, (sn.g * 0.625 + sn.b * 0.25 + sn.a * 0.125) - 1.0, 1.0, 0.0, 1.0);
-                alpha += SAT(R(SN * SA, 1.0 - global_coverage * WM, 1.0, 0.0, 1.0)) * DA;
+                alpha += SAT(R(SN * SA, 1.0 - WM, 1.0, 0.0, 1.0)) * DA;
                 if(alpha >= 1.0) {
-                    break;
+                    return 1.0;
                 }
-                d += interval / 2.0;
+                d += interval / 10.0;
                 continue;
             }
             d += interval;
@@ -116,7 +116,7 @@ function fragmentShader() {
         vec3 rd = normalize(vec3(uv, -1.0));
         float alpha = ray_march(ro, rd);
         vec3 color = vec3(1);// * alpha;
-        out_color = vec4(color, alpha);// < EPSILON ? 0 : 1);
+        out_color = vec4(color, alpha);// < 0.1 ? 0.0 : alpha);
     }
 `
 }
@@ -127,8 +127,8 @@ stats.showPanel(1);
 document.body.appendChild(stats.dom);
 // dat.gui.js
 var configLayout = function () {
-    this.global_coverage = 1.0;
-    this.global_density = 0.2;
+    this.global_coverage = 0.27;
+    this.global_density = 0.16;
 };
 var config = new configLayout();
 var gui = new dat.GUI();
@@ -187,8 +187,8 @@ fileLoader.load(
         /**
          * Uniforms
          */
-        var skyMin = new THREE.Vector3(-5, 0.0, -5);
-        var skyMax = new THREE.Vector3(5, 1.0, 5);
+        var skyMin = new THREE.Vector3(-50, 0.4, -50);
+        var skyMax = new THREE.Vector3(50, 1.4, 50);
         // var skyMin = new THREE.Vector3(-1, -1, -1);
         // var skyMax = new THREE.Vector3(1, 1, 1);
 
