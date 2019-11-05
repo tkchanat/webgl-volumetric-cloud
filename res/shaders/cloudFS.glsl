@@ -143,8 +143,12 @@ void main() {
     }
 
     // calculate final color
+    vec3 sunDirection = normalize(sunPosition);
+    float horizonFactor = (1.0 - abs(dot(sunDirection, vec3(0, 1, 0))));
+    vec3 sunColor = vec3(1) * max(dot(sunDirection, vec3(0, 1, 0)), 0.0);
+    sunColor += vec3(0.99, 0.86, 0.69) * horizonFactor;
     float cosTheta = dot(normalize(sunPosition), rayDirection);
-    float highlight = InOutScatter(cosTheta);
-    vec3 color = sun_color * attenuation * highlight;
+    float highlight = LERP(1.0, InOutScatter(cosTheta), horizonFactor);
+    vec3 color = sunColor * attenuation * highlight;
     out_color = vec4(color, totalDensity);
 }
