@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack --entry ./src/index.js --output-filename ./main.js",
     "serve": "webpack-dev-server --entry ./src/index.js --output-filename ./dist/main.js",
     "generate": "node generate.js"
   },
