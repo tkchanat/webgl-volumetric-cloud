@@ -16,7 +16,7 @@ document.body.appendChild(stats.dom);
 // dat.gui.js
 var configLayout = function () {
     this.global_coverage = 0.27;
-    this.global_density = 0.16;
+    this.global_density = 0.4;
     this.global_lightAbsorption = 1.0;
     this.cloud_in_scatter = 0.43;
     this.cloud_out_scatter = 0.47;
@@ -62,7 +62,7 @@ scene.background = new THREE.Color(0x000000);
  */
 var fileLoader = new THREE.FileLoader();
 // weather_map
-var weather_map = new THREE.TextureLoader().load('res/textures/weather_map.png');
+var weather_map = new THREE.TextureLoader().load('res/textures/weather_map2.png');
 // detail_map
 var detail_map;
 // detail_noise.bin
@@ -218,10 +218,10 @@ function Run() {
         planeMaterial.uniforms.cloud_silver_exponent.value = config.cloud_silver_exponent;
         renderer.clear();
         renderer.render(scene, camera);
-        setTimeout(function () {
+        // setTimeout(function () {
             requestAnimationFrame(animate);
             stats.end();
-        }, 1000 / 20);
+        // }, 1000 / 20);
     };
     animate();
 }

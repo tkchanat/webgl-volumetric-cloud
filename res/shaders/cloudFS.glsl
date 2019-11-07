@@ -1,7 +1,7 @@
 #version 300 es
 #define EPSILON 0.0001
 #define PI 3.14159
-#define MAX_ITERATION 256
+#define MAX_ITERATION 128
 #define SUN_STEPS 4
 
 precision highp sampler2D;
@@ -40,10 +40,12 @@ float LERP(float v0, float v1, float i) {
     return (1.0 - i) * v0 + i * v1;
 }
 
-float dist_func(vec3 p) {
-    vec3 sphere_position = vec3(0.0, 0.0, 0.0);
-    float sphere_dist = length(p - sphere_position) - 1.0;
-    return sphere_dist;
+float sdSphere(vec3 p, vec3 c, float r) {
+    return length(p-c) - r;
+}
+
+float sdBox(vec3 p, vec3 s) {
+    return length(max(abs(p)-s, 0.0));
 }
 
 float HeightAlter(float ph, vec4 map) {
@@ -121,22 +123,23 @@ void main() {
     vec2 uv = (2.0 * gl_FragCoord.xy - resolution.xy) / resolution.y;
     vec3 rayOrigin = cameraPosition;
     vec3 rayDirection = normalize(vec3(uv, -1.0));
-
+    
     // ray march along the ray direction
     float stepSize = 0.1;
-    stepSize = 0.1 * (1.0 - max(dot(rayDirection, vec3(0, 1, 0)), 0.0));
+    // stepSize = 0.1 * (1.0 - max(dot(rayDirection, vec3(0, 1, 0)), 0.0));
     float attenuation = 1.0;
     float totalDensity = 0.0;
-    float distanceTravelled = 0.0;
+    float distanceTravelled = sdBox(rayOrigin - (skyMin + skyMax) / 2.0, abs(skyMax - (skyMin + skyMax) / 2.0));
     float distanceLimit = 25.0;
+    float o = 0.0;
     for(int i = 0; i < MAX_ITERATION; ++i) {
-        vec3 rayPosition = rayOrigin + rayDirection * distanceTravelled;
+        vec3 rayPosition = rayOrigin + rayDirection * distanceTravelled;        
         float density = SampleDensity(rayPosition);
         totalDensity += density;
         if(density > 0.0) {
             float transmittance = LightMarch(rayPosition);
             attenuation *= transmittance;
-            distanceTravelled += stepSize / 10.0;
+            distanceTravelled += stepSize / 3.0;
             continue;
         }
         distanceTravelled += stepSize;
