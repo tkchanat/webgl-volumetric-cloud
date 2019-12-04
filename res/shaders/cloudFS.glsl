@@ -1,7 +1,7 @@
 #version 300 es
 #define EPSILON 0.0001
 #define PI 3.14159
-#define MAX_ITERATION 128
+#define MAX_ITERATION 256
 #define SUN_STEPS 4
 
 precision highp sampler2D;
@@ -17,6 +17,7 @@ uniform vec3 sunPosition;
 uniform vec3 cameraPosition;
 uniform vec2 resolution;
 uniform sampler2D weather_map;
+uniform sampler2D blue_noise;
 uniform sampler3D detail_map;
 uniform vec3 sun_color;
 uniform float global_coverage;
@@ -27,6 +28,7 @@ uniform float cloud_out_scatter;
 uniform float cloud_scatter_ratio;
 uniform float cloud_silver_intensity;
 uniform float cloud_silver_exponent;
+uniform float cloud_out_scatter_ambient;
 
 float R(float v, float lo, float ho, float ln, float hn) {
     return ln + (v - lo) * (hn - ln) / (ho - lo);
@@ -38,14 +40,6 @@ float SAT(float v) {
 
 float LERP(float v0, float v1, float i) {
     return (1.0 - i) * v0 + i * v1;
-}
-
-float sdSphere(vec3 p, vec3 c, float r) {
-    return length(p-c) - r;
-}
-
-float sdBox(vec3 p, vec3 s) {
-    return length(max(abs(p)-s, 0.0));
 }
 
 float HeightAlter(float ph, vec4 map) {
@@ -81,12 +75,12 @@ float SampleDensity(vec3 p) {
 
         // weather_map
         vec4 map = texture(weather_map, vec2(u, w));
-        float WM = max(map.r, SAT(global_coverage - 0.1) * map.g * 2.0);
+        float WM = max(map.r, SAT(global_coverage) * map.g * 2.0);
         float SA = HeightAlter(v, map);
         float DA = DensityAlter(v, map);
 
         // detail_map
-        vec4 sn = texture(detail_map, .5 + .5 * vec3(p.x, p.y, p.z));
+        vec4 sn = texture(detail_map, .2 * vec3(p.x, p.y, p.z));
         float SN = R(sn.r, (sn.g * 0.625 + sn.b * 0.25 + sn.a * 0.125) - 1.0, 1.0, 0.0, 1.0);
         return SAT(R(SN * SA, 1.0 - WM, 1.0, 0.0, 1.0)) * DA;
     }
@@ -106,15 +100,29 @@ float InOutScatter(float cosTheta) {
     return LERP(in_scatter_hg, out_scatter_hg, cloud_scatter_ratio);
 }
 
-float LightMarch(vec3 p) {
+float Attenuation(float densityToSun, float cosTheta) {
+    float prim = exp(-global_lightAbsorption * densityToSun);
+    float scnd = exp(-global_lightAbsorption * 0.2) * 0.7;
+    float checkval = R(cosTheta, 0.0, 1.0, scnd, scnd * 0.5);
+    return max(checkval, prim);
+}
+
+float OutScatterAmbient(float density, float ph) {
+    float depth = cloud_out_scatter_ambient * pow(density, R(ph, 0.3, 0.9, 0.5, 1.0));
+    float vertical = pow(SAT(R(ph, 0.0, 0.3, 0.8, 1.0)), 0.8);
+    float out_scatter = depth * vertical;
+    return 1.0 - SAT(out_scatter);
+}
+
+float LightMarch(vec3 p, float cosTheta) {
     vec3 direction = normalize(sunPosition);
-    float stepSize = 0.5 * (skyMax.y - skyMin.y) / float(SUN_STEPS);
+    float stepSize = 0.25 * (skyMax.y - skyMin.y) / float(SUN_STEPS);
     float totalDensity = 0.0;
     for(int step = 0; step < SUN_STEPS; ++step) {
         p += direction * stepSize;
         totalDensity += max(0.0, SampleDensity(p) * stepSize);
     }
-    float transmittance = exp(-totalDensity * global_lightAbsorption);
+    float transmittance = Attenuation(totalDensity, cosTheta);
     return transmittance;
 }
 
@@ -123,35 +131,39 @@ void main() {
     vec2 uv = (2.0 * gl_FragCoord.xy - resolution.xy) / resolution.y;
     vec3 rayOrigin = cameraPosition;
     vec3 rayDirection = normalize(vec3(uv, -1.0));
+    vec3 sunDirection = normalize(sunPosition);
+    float cosTheta = dot(sunDirection, rayDirection);
     
     // ray march along the ray direction
     float stepSize = 0.1;
-    // stepSize = 0.1 * (1.0 - max(dot(rayDirection, vec3(0, 1, 0)), 0.0));
+    float dist_start = 0.0; // sdBox(rayOrigin - (skyMin + skyMax) / 2.0, abs(skyMax - (skyMin + skyMax) / 2.0));
+    dist_start += (texture(blue_noise, uv).r - 0.5) * 2.0 * stepSize;
     float attenuation = 1.0;
     float totalDensity = 0.0;
-    float distanceTravelled = sdBox(rayOrigin - (skyMin + skyMax) / 2.0, abs(skyMax - (skyMin + skyMax) / 2.0));
-    float distanceLimit = 25.0;
-    float o = 0.0;
+    float distanceTravelled = dist_start;
+    float depthValue = 0.0;
     for(int i = 0; i < MAX_ITERATION; ++i) {
         vec3 rayPosition = rayOrigin + rayDirection * distanceTravelled;        
         float density = SampleDensity(rayPosition);
         totalDensity += density;
+        if(totalDensity >= 1.0) {
+            break;
+        }
         if(density > 0.0) {
-            float transmittance = LightMarch(rayPosition);
-            attenuation *= transmittance;
-            distanceTravelled += stepSize / 3.0;
-            continue;
+            float transmittance = LightMarch(rayPosition, cosTheta);
+            float scatter = OutScatterAmbient(density, R(rayPosition.y, skyMin.y, skyMax.y, 0.0, 1.0));
+            attenuation *= transmittance * scatter;
+            depthValue = distanceTravelled / 25.0;
         }
         distanceTravelled += stepSize;
     }
 
     // calculate final color
-    vec3 sunDirection = normalize(sunPosition);
+    float atmosphericBlending = 1.0 - depthValue;
     float horizonFactor = (1.0 - abs(dot(sunDirection, vec3(0, 1, 0))));
     vec3 sunColor = vec3(1) * max(dot(sunDirection, vec3(0, 1, 0)), 0.0);
     sunColor += vec3(0.99, 0.86, 0.69) * horizonFactor;
-    float cosTheta = dot(normalize(sunPosition), rayDirection);
     float highlight = LERP(1.0, InOutScatter(cosTheta), horizonFactor);
     vec3 color = sunColor * attenuation * highlight;
-    out_color = vec4(color, totalDensity);
+    out_color = vec4(color, totalDensity * atmosphericBlending);
 }
