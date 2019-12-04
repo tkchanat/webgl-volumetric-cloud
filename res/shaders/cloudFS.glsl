@@ -2,7 +2,7 @@
 #define EPSILON 0.0001
 #define PI 3.14159
 #define MAX_ITERATION 256
-#define SUN_STEPS 4
+#define SUN_STEPS 2
 
 precision highp sampler2D;
 precision highp sampler3D;
@@ -16,6 +16,8 @@ uniform vec3 skyMax;
 uniform vec3 sunPosition;
 uniform vec3 cameraPosition;
 uniform vec2 resolution;
+uniform int updatePixel;
+uniform sampler2D prevFrame;
 uniform sampler2D weather_map;
 uniform sampler2D blue_noise;
 uniform sampler3D detail_map;
@@ -127,6 +129,12 @@ float LightMarch(vec3 p, float cosTheta) {
 }
 
 void main() {
+    // update pixel
+    if (int(gl_FragCoord.y * 4.0 + gl_FragCoord.x) % 16 != updatePixel) {
+        out_color = vec4(texture(prevFrame, frag_uv).rgb, 1.0);
+        return;
+    }
+
     // get ray direction into the scene
     vec2 uv = (2.0 * gl_FragCoord.xy - resolution.xy) / resolution.y;
     vec3 rayOrigin = cameraPosition;

@@ -59,9 +59,9 @@ var resolution = new THREE.Vector2(canvas.width, canvas.height);
 var camera = new THREE.PerspectiveCamera(75, resolution.x / resolution.y, 0.1, 1000);
 var keyboard = new THREEx.KeyboardState();
 var clock = new THREE.Clock();
-scene.background = new THREE.Color(0x000000);
-camera.position.z = 5.0;
-
+var prevFrame = new THREE.DataTexture(new Uint8Array(canvas.width * canvas.height * 3), canvas.width, canvas.height, THREE.RGBFormat);
+prevFrame.minFilter = THREE.NearestFilter;
+prevFrame.maxFilter = THREE.NearestFilter;
 
 /**
  * Resources
@@ -169,12 +169,16 @@ function Run() {
     sun_gui.add(effectController, "sun").onChange(guiChanged);
     guiChanged();
 
+    var updatePixel = 0;
+    var pixelSequence = [0, 10, 2, 8, 5, 15, 7, 13, 1, 11, 3, 9, 4, 14, 6, 12];
     var planeGeometry = new THREE.PlaneGeometry(1, 1);
     var planeUniforms = {
         skyMin: new THREE.Uniform(skyMin),
         skyMax: new THREE.Uniform(skyMax),
         sunPosition: new THREE.Uniform(sunSphere.position),
         resolution: new THREE.Uniform(resolution),
+        updatePixel: new THREE.Uniform(updatePixel),
+        prevFrame: new THREE.Uniform(prevFrame),
         weather_map: new THREE.Uniform(weather_map),
         blue_noise: new THREE.Uniform(blue_noise),
         detail_map: new THREE.Uniform(detail_map),
@@ -203,23 +207,24 @@ function Run() {
     /**
      * Render Loop
      */
+    var frame = 0;
     var animate = function () {
         var dt = clock.getDelta();
         var t = clock.getElapsedTime();
         stats.begin();
         // keyboard input
         var moveDistance = 2 * dt;
-        if(keyboard.pressed("W"))
+        if (keyboard.pressed("W"))
             camera.position.z -= moveDistance;
-        else if(keyboard.pressed("S"))
+        else if (keyboard.pressed("S"))
             camera.position.z += moveDistance;
-        if(keyboard.pressed("A"))
+        if (keyboard.pressed("A"))
             camera.position.x -= moveDistance;
-        else if(keyboard.pressed("D"))
+        else if (keyboard.pressed("D"))
             camera.position.x += moveDistance;
-        if(keyboard.pressed("shift"))
+        if (keyboard.pressed("shift"))
             camera.position.y -= moveDistance;
-        else if(keyboard.pressed("space"))
+        else if (keyboard.pressed("space"))
             camera.position.y += moveDistance;
 
         // sky uniform update
@@ -231,7 +236,9 @@ function Run() {
         sunSphere.visible = effectController.sun;
         sky.material.uniforms["sunPosition"].value.copy(sunSphere.position);
         // cloud uniform update
+        updatePixel = (updatePixel + 1) % 16;
         plane.position.set(camera.position);
+        planeMaterial.uniforms.updatePixel.value = pixelSequence[updatePixel];
         planeMaterial.uniforms.sunPosition.value = sunSphere.position;
         planeMaterial.uniforms.global_coverage.value = config.global_coverage;
         planeMaterial.uniforms.global_density.value = config.global_density;
@@ -242,12 +249,17 @@ function Run() {
         planeMaterial.uniforms.cloud_silver_intensity.value = config.cloud_silver_intensity;
         planeMaterial.uniforms.cloud_silver_exponent.value = config.cloud_silver_exponent;
         planeMaterial.uniforms.cloud_out_scatter_ambient.value = config.cloud_out_scatter_ambient;
-        renderer.clear();
         renderer.render(scene, camera);
+        renderer.copyFramebufferToTexture(new THREE.Vector2(0, 0), prevFrame);
+        frame++;
         // setTimeout(function () {
-        requestAnimationFrame(animate);
-        stats.end();
+            requestAnimationFrame(animate);
+            stats.end();
         // }, 1000 / 60);
     };
     animate();
+    window.setInterval(function() {
+        console.log(frame);
+        frame = 0;
+    }, 1000);
 }
