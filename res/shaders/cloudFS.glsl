@@ -2,7 +2,7 @@
 #define EPSILON 0.0001
 #define PI 3.14159
 #define MAX_ITERATION 256
-#define SUN_STEPS 2
+#define SUN_STEPS 1
 
 precision highp sampler2D;
 precision highp sampler3D;
@@ -24,6 +24,7 @@ uniform int updatePixel;
 uniform sampler2D prevFrame;
 uniform sampler2D weather_map;
 uniform sampler2D blue_noise;
+uniform bool wind_animation;
 uniform float wind_speed;
 uniform vec3 wind_direction;
 uniform sampler3D detail_map;
@@ -82,18 +83,16 @@ float SampleDensity(vec3 p) {
 
         // weather_map
         vec4 map = texture(weather_map, vec2(u, w));
-        float WM = max(map.r, SAT(global_coverage) * map.g * 2.0);
+        float WM = SAT(max(map.r, SAT(global_coverage) * map.g * 2.0));
         float SA = HeightAlter(v, map);
         float DA = DensityAlter(v, map);
 
         // detail_map
         vec4 sn = texture(detail_map, .5 + .3 * vec3(p.x, p.y, p.z));
-        vec4 dn = texture(detail_map_high, time * wind_speed * normalize(wind_direction) + 0.75 * vec3(p.x, p.y, p.z));
+        vec4 dn = texture(detail_map_high, (wind_animation ? time * wind_speed * normalize(wind_direction) : vec3(0.0)) + 0.75 * vec3(p.x, p.y, p.z));
         float DN_fbm = dn.r * 0.625 + dn.g * 0.25 + dn.b * 0.125;
-        float DN_mod = 1.25 * DN_fbm;// * LERP(DN_fbm, 1.0 - DN_fbm, SAT(v * 5.0));
         float SN_sample = R(sn.r, (sn.g * 0.625 + sn.b * 0.25 + sn.a * 0.125) - 1.0, 1.0, 0.0, 1.0);
-        float SN_nd = SAT(R(SN_sample * SA, 1.0 - global_coverage * WM, 1.0, 0.0, 1.0));
-        return SAT(R(SN_sample * SA * DN_mod, 1.0 - WM, 1.0, 0.0, 1.0)) * DA;
+        density = SAT(R(SN_sample * SA * DN_fbm, 1.0 - WM, 1.0, 0.0, 1.0)) * DA;
     }
     return density;
 }

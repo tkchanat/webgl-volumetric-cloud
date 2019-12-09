@@ -16,7 +16,7 @@ stats.showPanel(0);
 document.body.appendChild(stats.dom);
 // dat.gui.js
 var configLayout = function () {
-    this.wind_speed = 0.5;
+    this.wind_speed = 0.75;
     this.wind_direction_x = 0.4;
     this.wind_direction_y = 0.0;
     this.wind_direction_z = -1.0;
@@ -29,19 +29,23 @@ var configLayout = function () {
     this.cloud_silver_intensity = 5.0;
     this.cloud_silver_exponent = 2.3;
     this.cloud_out_scatter_ambient = 0.0;
+    this.wind_animation = true;
     this.use_blue_noise = true;
     this.use_quarter_update = false;
+    this.vSync = false;
 };
 var config = new configLayout();
 var gui = new dat.GUI();
 gui.add(config, "wind_speed", 0.0, 3.0).step(0.001);
 gui.add(config, "wind_direction_x", -1.0, 1.0).step(0.01);
-gui.add(config, "wind_direction_y", -1.0, 1.0).step(0.01);
+// gui.add(config, "wind_direction_y", -1.0, 1.0).step(0.01);
 gui.add(config, "wind_direction_z", -1.0, 1.0).step(0.01);
+gui.add(config, "wind_animation");
 gui.add(config, "global_coverage", 0.0, 1.0).step(0.001);
 gui.add(config, "global_density", 0.01, 1.0).step(0.001);
 gui.add(config, "global_lightAbsorption", 0.0, 2.0).step(0.001);
 gui.add(config, "use_blue_noise");
+gui.add(config, "vSync");
 // gui.add(config, "use_quarter_update");
 // gui.add(config, "cloud_in_scatter", 0.0, 1.0).step(0.001);
 // gui.add(config, "cloud_out_scatter", 0.0, 1.0).step(0.001);
@@ -88,6 +92,8 @@ target.depthTexture.type = THREE.UnsignedShortType;
 var prevFrame = new THREE.DataTexture(new Uint8Array(canvas.width * canvas.height * 3), canvas.width, canvas.height, THREE.RGBFormat);
 prevFrame.minFilter = THREE.NearestFilter;
 prevFrame.maxFilter = THREE.NearestFilter;
+camera.position.y = -2.0;
+camera.position.z = 3.0;
 
 /**
  * Resources
@@ -247,6 +253,7 @@ function Run() {
         prevFrame: new THREE.Uniform(prevFrame),
         weather_map: new THREE.Uniform(weather_map),
         blue_noise: new THREE.Uniform(blue_noise),
+        wind_animation: new THREE.Uniform(config.wind_animation),
         wind_speed: new THREE.Uniform(config.wind_speed),
         wind_direction: new THREE.Uniform(new THREE.Vector3(config.wind_direction_x, config.wind_direction_y, config.wind_direction_z)),
         detail_map: new THREE.Uniform(detail_map),
@@ -314,6 +321,7 @@ function Run() {
         updatePixel = (updatePixel + 1) % 16;
         plane.position.set(camera.position);
         planeMaterial.uniforms.time.value = time;
+        planeMaterial.uniforms.wind_animation.value = config.wind_animation;
         planeMaterial.uniforms.wind_speed.value = config.wind_speed;
         planeMaterial.uniforms.wind_direction.value = new THREE.Vector3(config.wind_direction_x, config.wind_direction_y, config.wind_direction_z);
         planeMaterial.uniforms.updatePixel.value = pixelSequence[updatePixel];
@@ -337,10 +345,15 @@ function Run() {
         renderer.render(postScene, camera);
         // renderer.copyFramebufferToTexture(new THREE.Vector2(0, 0), prevFrame);
         frame++;
-        // setTimeout(function () {
+        if(config.vSync) {
+            setTimeout(function () {
+                requestAnimationFrame(animate);
+                stats.end();
+            }, 1000 / 30);
+        } else {
             requestAnimationFrame(animate);
             stats.end();
-        // }, 1000 / 60);
+        }
     };
     animate();
     window.setInterval(function () {
