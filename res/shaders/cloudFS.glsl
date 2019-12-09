@@ -9,8 +9,12 @@ precision highp sampler3D;
 precision highp float;
 
 in vec2 frag_uv;
+in mat4 frag_viewProjMatrix;
 out vec4 out_color;
 
+uniform sampler2D tDiffuse;
+uniform sampler2D tDepth;
+uniform float time;
 uniform vec3 skyMin;
 uniform vec3 skyMax;
 uniform vec3 sunPosition;
@@ -20,7 +24,10 @@ uniform int updatePixel;
 uniform sampler2D prevFrame;
 uniform sampler2D weather_map;
 uniform sampler2D blue_noise;
+uniform float wind_speed;
+uniform vec3 wind_direction;
 uniform sampler3D detail_map;
+uniform sampler3D detail_map_high;
 uniform vec3 sun_color;
 uniform float global_coverage;
 uniform float global_density;
@@ -31,6 +38,8 @@ uniform float cloud_scatter_ratio;
 uniform float cloud_silver_intensity;
 uniform float cloud_silver_exponent;
 uniform float cloud_out_scatter_ambient;
+uniform bool use_blue_noise;
+uniform bool use_quarter_update;
 
 float R(float v, float lo, float ho, float ln, float hn) {
     return ln + (v - lo) * (hn - ln) / (ho - lo);
@@ -46,12 +55,10 @@ float LERP(float v0, float v1, float i) {
 
 float HeightAlter(float ph, vec4 map) {
     // round bottom
-    float ret_val = SAT(R(ph, 0.0, 0.07, 0.0, 1.0));
+    float ret_val = SAT(R(ph, 0.0 , 0.07, 0.0, 1.0));
     // round top
     float stop_height = SAT(map.b + 0.12);
     ret_val *= SAT(R(ph, stop_height * 0.2, stop_height, 1.0, 0.0));
-    // apply anvil
-    // ret_val = pow(ret_val, SAT(R(ph, 0.65, 0.95, 1.0(1 - cloud_anvil_amount * global_coverage))));
     return ret_val;
 }
 
@@ -63,8 +70,6 @@ float DensityAlter(float ph, vec4 map) {
     ret_val *= SAT(R(ph, 0.9, 1.0, 1.0, 0.0));
     // apply weather_map density
     ret_val *= global_density * map.a * 2.0;
-    // reduce density for the anvil
-    // ret_val *= LERP(1, SAT(R(pow(ph, 0.5), 0.4, 0.95, 1.0, 0.2)), cloud_anvil_amount);
     return ret_val;
 }
 
@@ -82,9 +87,13 @@ float SampleDensity(vec3 p) {
         float DA = DensityAlter(v, map);
 
         // detail_map
-        vec4 sn = texture(detail_map, .2 * vec3(p.x, p.y, p.z));
-        float SN = R(sn.r, (sn.g * 0.625 + sn.b * 0.25 + sn.a * 0.125) - 1.0, 1.0, 0.0, 1.0);
-        return SAT(R(SN * SA, 1.0 - WM, 1.0, 0.0, 1.0)) * DA;
+        vec4 sn = texture(detail_map, .5 + .3 * vec3(p.x, p.y, p.z));
+        vec4 dn = texture(detail_map_high, time * wind_speed * normalize(wind_direction) + 0.75 * vec3(p.x, p.y, p.z));
+        float DN_fbm = dn.r * 0.625 + dn.g * 0.25 + dn.b * 0.125;
+        float DN_mod = 1.25 * DN_fbm;// * LERP(DN_fbm, 1.0 - DN_fbm, SAT(v * 5.0));
+        float SN_sample = R(sn.r, (sn.g * 0.625 + sn.b * 0.25 + sn.a * 0.125) - 1.0, 1.0, 0.0, 1.0);
+        float SN_nd = SAT(R(SN_sample * SA, 1.0 - global_coverage * WM, 1.0, 0.0, 1.0));
+        return SAT(R(SN_sample * SA * DN_mod, 1.0 - WM, 1.0, 0.0, 1.0)) * DA;
     }
     return density;
 }
@@ -94,17 +103,19 @@ float HG(float cosTheta, float g) {
     return ((1.0 - g2) / pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5)) / 4.0 * PI;
 }
 
-float InOutScatter(float cosTheta) {
+float InOutScatter(float cosTheta, float exponent) {
     float hg1 = HG(cosTheta, cloud_in_scatter);
-    float hg2 = cloud_silver_intensity * pow(SAT(cosTheta), cloud_silver_exponent);
+    float hg2 = cloud_silver_intensity * pow(SAT(cosTheta), exponent);
     float in_scatter_hg = max(hg1, hg2);
     float out_scatter_hg = HG(cosTheta, -cloud_out_scatter);
     return LERP(in_scatter_hg, out_scatter_hg, cloud_scatter_ratio);
 }
 
 float Attenuation(float densityToSun, float cosTheta) {
-    float prim = exp(-global_lightAbsorption * densityToSun);
-    float scnd = exp(-global_lightAbsorption * 0.2) * 0.7;
+    float horizonFactor = pow(1.0 - abs(dot(normalize(sunPosition), vec3(0, 1, 0))), 2.0);
+    float absorption = mix(0.2, global_lightAbsorption, horizonFactor);
+    float prim = exp(-absorption * densityToSun);
+    float scnd = exp(-absorption * 0.2) * 0.7;
     float checkval = R(cosTheta, 0.0, 1.0, scnd, scnd * 0.5);
     return max(checkval, prim);
 }
@@ -130,8 +141,8 @@ float LightMarch(vec3 p, float cosTheta) {
 
 void main() {
     // update pixel
-    if (int(gl_FragCoord.y * 4.0 + gl_FragCoord.x) % 16 != updatePixel) {
-        out_color = vec4(texture(prevFrame, frag_uv).rgb, 1.0);
+    out_color = texture(tDiffuse, frag_uv);
+    if (use_quarter_update && int(gl_FragCoord.y * 4.0 + gl_FragCoord.x) % 16 != updatePixel) {
         return;
     }
 
@@ -144,34 +155,42 @@ void main() {
     
     // ray march along the ray direction
     float stepSize = 0.1;
-    float dist_start = 0.0; // sdBox(rayOrigin - (skyMin + skyMax) / 2.0, abs(skyMax - (skyMin + skyMax) / 2.0));
-    dist_start += (texture(blue_noise, uv).r - 0.5) * 2.0 * stepSize;
+    float dist_start = 0.0;
+    if(use_blue_noise)
+        dist_start += (texture(blue_noise, uv).r - 0.5) * 2.0 * stepSize;
     float attenuation = 1.0;
     float totalDensity = 0.0;
     float distanceTravelled = dist_start;
-    float depthValue = 0.0;
+    vec3 firstHit = vec3(1000); // far clipping plane
     for(int i = 0; i < MAX_ITERATION; ++i) {
         vec3 rayPosition = rayOrigin + rayDirection * distanceTravelled;        
         float density = SampleDensity(rayPosition);
         totalDensity += density;
         if(totalDensity >= 1.0) {
+            totalDensity = 1.0;
             break;
         }
         if(density > 0.0) {
+            if(firstHit == vec3(1000)) firstHit = rayPosition - rayDirection * dist_start;
             float transmittance = LightMarch(rayPosition, cosTheta);
             float scatter = OutScatterAmbient(density, R(rayPosition.y, skyMin.y, skyMax.y, 0.0, 1.0));
             attenuation *= transmittance * scatter;
-            depthValue = distanceTravelled / 25.0;
         }
         distanceTravelled += stepSize;
     }
+    float mountainDepth = pow(texture(tDepth, frag_uv).r, 3.0);
+    vec4 cloudHomoCoord = frag_viewProjMatrix * vec4(firstHit, 1.0);
+    cloudHomoCoord /= cloudHomoCoord.w;
+    float cloudDepth = cloudHomoCoord.z;
+    totalDensity = (cloudDepth < mountainDepth) ? totalDensity : 0.0;
 
     // calculate final color
-    float atmosphericBlending = 1.0 - depthValue;
-    float horizonFactor = (1.0 - abs(dot(sunDirection, vec3(0, 1, 0))));
-    vec3 sunColor = vec3(1) * max(dot(sunDirection, vec3(0, 1, 0)), 0.0);
-    sunColor += vec3(0.99, 0.86, 0.69) * horizonFactor;
-    float highlight = LERP(1.0, InOutScatter(cosTheta), horizonFactor);
-    vec3 color = sunColor * attenuation * highlight;
-    out_color = vec4(color, totalDensity * atmosphericBlending);
+    float horizonFactor = pow(1.0 - SAT(dot(sunDirection, vec3(0, 1, 0))), 2.0);
+    vec3 sunColor = mix(vec3(0.93, 0.97, 1.0), vec3(0.99, 0.86, 0.69), horizonFactor);
+    float exponent = mix(1.5, 2.3, horizonFactor);
+    float highlight = LERP(1.0, InOutScatter(cosTheta, exponent), horizonFactor);
+    vec3 color = sunColor * attenuation * highlight * pow(SAT(1.2 - horizonFactor), 0.5);
+
+    vec3 finalColor = mix(out_color.rgb, color, totalDensity);
+    out_color = vec4(finalColor, 1.0);
 }

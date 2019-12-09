@@ -254,3 +254,25 @@ fs.writeFile("./res/detail_noise.bin", buf, function (err) {
     }
     console.log("Output is saved as ./res/detail_noise.bin");
 });
+
+// generate noise textures
+var high_data = new Uint8Array(32 * 32 * 32 * 3);
+for (var z = 0; z < 32; ++z) {
+    for (var y = 0; y < 32; ++y) {
+        for (var x = 0; x < 32; ++x) {
+            high_data[z * 32 * 32 * 3 + y * 32 * 3 + x * 3 + 0] = myWorley(x, y, z, 4);
+            high_data[z * 32 * 32 * 3 + y * 32 * 3 + x * 3 + 1] = myWorley(x, y, z, 8);
+            high_data[z * 32 * 32 * 3 + y * 32 * 3 + x * 3 + 2] = myWorley(x, y, z, 16);
+        }
+    }
+}
+var high_buf = Buffer.from(high_data);
+console.log("Buffer size is: " + high_buf.length);
+
+// save data
+fs.writeFile("./res/detail_noise_high.bin", high_buf, function (err) {
+    if (err) {
+        return console.log(err);
+    }
+    console.log("Output is saved as ./res/detail_noise_high.bin");
+});
