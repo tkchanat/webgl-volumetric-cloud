@@ -36,23 +36,34 @@ var configLayout = function () {
 };
 var config = new configLayout();
 var gui = new dat.GUI();
-gui.add(config, "wind_speed", 0.0, 3.0).step(0.001);
-gui.add(config, "wind_direction_x", -1.0, 1.0).step(0.01);
-// gui.add(config, "wind_direction_y", -1.0, 1.0).step(0.01);
-gui.add(config, "wind_direction_z", -1.0, 1.0).step(0.01);
-gui.add(config, "wind_animation");
-gui.add(config, "global_coverage", 0.0, 1.0).step(0.001);
-gui.add(config, "global_density", 0.01, 1.0).step(0.001);
-gui.add(config, "global_lightAbsorption", 0.0, 2.0).step(0.001);
-gui.add(config, "use_blue_noise");
-gui.add(config, "vSync");
-// gui.add(config, "use_quarter_update");
-// gui.add(config, "cloud_in_scatter", 0.0, 1.0).step(0.001);
-// gui.add(config, "cloud_out_scatter", 0.0, 1.0).step(0.001);
-// gui.add(config, "cloud_scatter_ratio", 0.0, 1.0).step(0.001);
-// gui.add(config, "cloud_silver_intensity", 0.0, 10.0).step(0.001);
-// gui.add(config, "cloud_silver_exponent", 0.0, 10.0).step(0.001);
-// gui.add(config, "cloud_out_scatter_ambient", 0.0, 1.0).step(0.001);
+gui.domElement.id = "gui";
+var helpergui = gui.addFolder("Help");
+var HelperText = function() {
+    this.HorizontalControl = "";
+    this.VerticalControl = "";
+}
+var helperText = new HelperText();
+helpergui.open();
+helpergui.add(helperText, "HorizontalControl");
+helpergui.add(helperText, "VerticalControl");
+var cloudgui = gui.addFolder("Cloud");
+cloudgui.add(config, "use_blue_noise");
+cloudgui.add(config, "wind_animation");
+cloudgui.add(config, "vSync");
+cloudgui.add(config, "wind_speed", 0.0, 3.0).step(0.001);
+cloudgui.add(config, "wind_direction_x", -1.0, 1.0).step(0.01);
+// cloudgui.add(config, "wind_direction_y", -1.0, 1.0).step(0.01);
+cloudgui.add(config, "wind_direction_z", -1.0, 1.0).step(0.01);
+cloudgui.add(config, "global_coverage", 0.0, 1.0).step(0.001);
+cloudgui.add(config, "global_density", 0.01, 1.0).step(0.001);
+// cloudgui.add(config, "global_lightAbsorption", 0.0, 2.0).step(0.001);
+// cloudgui.add(config, "use_quarter_update");
+cloudgui.add(config, "cloud_in_scatter", 0.0, 1.0).step(0.001);
+cloudgui.add(config, "cloud_out_scatter", 0.0, 1.0).step(0.001);
+cloudgui.add(config, "cloud_scatter_ratio", 0.0, 1.0).step(0.001);
+cloudgui.add(config, "cloud_silver_intensity", 0.0, 10.0).step(0.001);
+// cloudgui.add(config, "cloud_silver_exponent", 0.0, 10.0).step(0.001);
+cloudgui.add(config, "cloud_out_scatter_ambient", 0.0, 0.2).step(0.0001);
 
 // resources declaration
 var resourceStatus = {
@@ -177,7 +188,7 @@ objloader.load("res/models/mountains.obj",
     }
 );
 
-var overlay = document.getElementById("overlay").getContext("2d");
+var overlay = document.querySelector("#overlay").getContext("2d");
 overlay.font = "30px Arial";
 overlay.textAlign = "center";
 function WaitAllResources() {
@@ -186,12 +197,13 @@ function WaitAllResources() {
     Object.keys(resourceStatus).forEach(function (value, i) {
         var loaded = resourceStatus[value];
         allTrue &= loaded;
+        overlay.fillStyle = "white";
         overlay.fillText(value + (loaded ? " ✓" : "..."), canvas.width / 2, canvas.height / 2 + i * 30);
     });
     if (allTrue) {
         setTimeout(() => {
             Run();
-            document.body.removeChild(document.getElementById("overlay"));
+            document.querySelector("#overlay").remove();
         }, 10);
     }
     else setTimeout(WaitAllResources, 10);
@@ -234,9 +246,10 @@ function Run() {
         sun: true
     };
     var distance = 400000;
-    var sun_gui = new dat.GUI();
+    var sun_gui = gui.addFolder("Sun");
+    sun_gui.domElement.id = "sungui";
     sun_gui.add(effectController, "inclination", 0, 0.75, 0.0001);
-
+    sun_gui.open();
     var time = 0;
     var updatePixel = 0;
     var pixelSequence = [0, 10, 2, 8, 5, 15, 7, 13, 1, 11, 3, 9, 4, 14, 6, 12];
@@ -290,6 +303,11 @@ function Run() {
         var dt = clock.getDelta();
         time = clock.getElapsedTime();
         stats.begin();
+
+        // force helper message
+        helperText.HorizontalControl = "W, A, S, D";
+        helperText.VerticalControl = "Shift, Space";
+        helpergui.updateDisplay();
 
         // keyboard input
         var moveDistance = 4 * dt;
@@ -345,7 +363,7 @@ function Run() {
         renderer.render(postScene, camera);
         // renderer.copyFramebufferToTexture(new THREE.Vector2(0, 0), prevFrame);
         frame++;
-        if(config.vSync) {
+        if (config.vSync) {
             setTimeout(function () {
                 requestAnimationFrame(animate);
                 stats.end();
@@ -356,8 +374,8 @@ function Run() {
         }
     };
     animate();
-    window.setInterval(function () {
-        console.log(frame);
-        frame = 0;
-    }, 1000);
+    // window.setInterval(function () {
+    //     console.log(frame);
+    //     frame = 0;
+    // }, 1000);
 }

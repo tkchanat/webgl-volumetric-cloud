@@ -19,6 +19,11 @@ Execute the above commands in terminal and launch your browser. Go to `localhost
 ### Live Demo
 Check out the [live demo](https://tkchanat.github.io/webgl-volumetric-cloud/) if you want to skip the setup. 
 
+## Camera Controls
+`W, A, S, D - Horizonal camera movement`
+
+`Shift, Space - Vertical camera movement`
+
 ## Regenerate Noise Map
 ```sh
 node ./src/generate.js

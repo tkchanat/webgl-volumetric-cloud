@@ -6,14 +6,60 @@
     <title>WebGL Volumetric Cloud</title>
     <style>
         body {
-            margin: 0;
+            margin: 40px 0;
+            background: rgb(62, 76, 82);
+            background: linear-gradient(0deg, rgba(63, 81, 88, 1) 0%, rgba(48, 48, 48, 1) 68%);
+            font-family: Arial, Helvetica, sans-serif;
+            color: white;
+        }
+        
+        a {
+            color: white;
+            text-decoration: none;
+        }
+        
+        a:visited {
+            color: white;
+        }
+
+        h1, h4{
+            margin: 10px;
+            text-align: center;
+            font-weight: lighter;
+        }
+
+        #wrapper {
+            position: relative;
+            width: 1024px;
+            height: 768px;
+            padding: 0;
+            margin: 20px auto;
+            display: block;
+        }
+
+        #myCanvas,
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .card {
+            width: 250px;
+            box-shadow: 0 0 16px 8px rgba(0, 0, 0, 0.6), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+            text-align: center;
         }
     </style>
 </head>
 
 <body>
-    <canvas id="myCanvas" width="1920" height="1080"></canvas>
-    <canvas id="overlay" width="1920" height="1080" style="position: absolute; left: 0; top: 0; z-index: 10;"></canvas>
+    <h1>☁️𝐖𝐞𝐛𝐆𝐋 𝐕𝐨𝐥𝐮𝐦𝐞𝐭𝐫𝐢𝐜 𝐂𝐥𝐨𝐮𝐝☁️</h1>
+    <h4>𝘝𝘪𝘦𝘸 𝘮𝘦 𝘰𝘯 <a href="https://github.com/tkchanat/webgl-volumetric-cloud">𝘎𝘪𝘵𝘏𝘶𝘣</a></h4>
+    <div id="wrapper" class="card"> 
+        <canvas id="myCanvas" width="1024" height="768"></canvas>
+        <canvas id="overlay" width="1024" height="768" style="z-index: 10"></canvas>
+    </div>
+
     <script src="src/threex.keyboardstate.js"></script>
     <script src="dist/main.js"></script>
 </body>
