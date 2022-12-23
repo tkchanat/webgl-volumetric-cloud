@@ -1,6 +1,8 @@
 # WebGL Volumetric Cloud :cloud:
 This is an individual project for fulfilling the course requirement of COMP5411 Advance Computer Graphics (2019 Fall). This work only aims to replicate the result in [Real-time rendering of volumetric clouds](https://pdfs.semanticscholar.org/89e9/153a091889c584df034a953a0eff4de45ee9.pdf). 
 
+## :warning: Whomever wish to use this project, be aware this is not a perfect replica of the original work. It may contain some dirty hacks.
+
 ## Screenshot
 ![screenshot](screenshots/2019_12_8.png)
 
